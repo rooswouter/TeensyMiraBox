@@ -9,7 +9,7 @@ public:
 
     StreamDockXL(LibUSBHIDAPI &transport, const HidDeviceInfo &dev_info);
 
-    int key_count() const override { return KEY_COUNT; }
+    int image_keys() const override { return KEY_COUNT; }
     void set_device() override;
     int set_brightness(int percent) override;
     int set_key_imageData(int key, const uint8_t *data, size_t length) override;

@@ -14,6 +14,9 @@ StreamDock::StreamDock(LibUSBHIDAPI &transport_ref, const HidDeviceInfo &dev_inf
     path = dev_info.path;
     serial_number = dev_info.serial_number;
 
+    if (!SD.begin(BUILTIN_SDCARD)) {
+        Serial.println("SD card initialization failed!");
+    }
 }
 
 StreamDock::~StreamDock() {
@@ -65,7 +68,7 @@ void StreamDock::disconnected() {
 }
 
 void StreamDock::clearIcon(int index) {
-    if (index < 1 || index > key_count()) {
+    if (index < 1 || index > image_keys()) {
         return;
     }
   const int hardware_key = get_image_key(static_cast<ButtonKey>(index));
@@ -124,7 +127,7 @@ void StreamDock::poll() {
 
     static uint8_t buffer[1024];
     const size_t length = read(buffer, sizeof(buffer));
-    if (length > 0) {
+       if (length > 0) {
         process_read_buffer(buffer, length);
     }
 

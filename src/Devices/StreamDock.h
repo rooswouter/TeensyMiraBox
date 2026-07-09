@@ -68,6 +68,7 @@ public:
     std::string getPath() const;
     std::string get_serial_number() const;
     std::string id() const;
+    device_type get_device_type() const { return feature_option.deviceType; }
 
     virtual int set_brightness(int percent) = 0;
     virtual int set_key_image(int key, const char *filename);
@@ -76,7 +77,7 @@ public:
     virtual int get_image_key(ButtonKey logical_key) = 0;
     virtual InputEvent decode_input_event(int hardware_code, int state) = 0;
     virtual DeviceConfigEvent decode_device_config_event(const uint8_t *data, size_t length);
-    virtual int key_count() const { return 0; }
+    virtual int image_keys() const { return 0; }
     virtual ImageFormat key_image_format() const;
     virtual ImageFormat touchscreen_image_format() const;
 

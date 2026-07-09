@@ -1,7 +1,7 @@
 #include "DeviceHelpers.h"
 
 int setDualKeyImage(StreamDock &device, int key, const uint8_t *data, size_t length) {
-    if (key < 1 || key > device.key_count()) {
+    if (key < 1 || key > device.image_keys()) {
         return -1;
     }
     const int hardware_key = device.get_image_key(static_cast<ButtonKey>(key));

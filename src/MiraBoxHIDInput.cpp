@@ -13,6 +13,24 @@ hidclaim_t MiraBoxHIDInput::claim_collection(USBHIDParser *driver, Device_t *dev
     Serial.printf("MiraBoxHIDInput(%u : %p : %p) Claim: %x:%x usage: %x", index_, this, driver, dev->idVendor, dev->idProduct, topusage);
     Serial.printf(" SubClass: %x Protocol: %x",  driver->interfaceSubClass(), driver->interfaceProtocol());
   }
+
+  // index 1 = boot keyboard HID, index 2 = StreamDock control HID (non-boot interface).
+  // USBHost_t36 only calls hid_process_in_data() on topusage_drivers[0], so index 2
+  // must claim the first collection on the control interface (not a later 0xFFA0 one).
+  printf("claim_collection() index_: %d\n", index_);
+  printf("claim_collection() driver->interfaceSubClass(): %d\n", driver->interfaceSubClass());
+  printf("claim_collection() driver->interfaceProtocol(): %d\n", driver->interfaceProtocol());
+  if (index_ == 1) {
+    if (driver->interfaceSubClass() != 1 || driver->interfaceProtocol() !=1) {
+      if (show_raw_data) Serial.println(" - NO (not boot keyboard)");
+      return CLAIM_NO;
+    }
+  } else if (index_ == 2) {
+    if (driver->interfaceSubClass() == 1 && driver->interfaceProtocol() == 1) {
+      if (show_raw_data) Serial.println(" - NO (boot keyboard interface)");
+      return CLAIM_NO;
+    }
+  }
   if (mydevice != NULL && dev != mydevice) {
     if (show_raw_data) Serial.println("- NO (Device)");
     return CLAIM_NO;
@@ -153,10 +171,13 @@ bool MiraBoxHIDInput::hid_process_in_data(const Transfer_t *transfer) {
   switch (index_) {
     case 1:
       handle_keyboard_data(transfer);
-      break;
+      return !show_formated_data;
     case 2:
       queueInputReport((const uint8_t *)transfer->buffer, transfer->length);
       handle_mirabox_buttons_data(transfer);
+      // Always bypass HID parse(); StreamDock protocol needs raw report bytes.
+      return true;
+    default:
       break;
   }
   return !show_formated_data;
@@ -462,4 +483,28 @@ bool MiraBoxHIDInput::is_input_event_packet(const Transfer_t *transfer)
         and data[6] == 0x4B
     )
     */
+}
+
+
+void dump_hexbytes(const void *ptr, uint32_t len, uint32_t indent) {
+  if (ptr == NULL || len == 0) return;
+  uint32_t count = 0;
+  //  if (len > 64) len = 64; // don't go off deep end...
+  const uint8_t *p = (const uint8_t *)ptr;
+  while (len--) {
+    if (*p < 16) Serial.print('0');
+    Serial.print(*p++, HEX);
+    count++;
+    if (((count & 0x1f) == 0) && len) {
+      Serial.print("\n");
+      for (uint32_t i = 0; i < indent; i++) Serial.print(" ");
+    } else
+      Serial.print(' ');
+  }
+  Serial.println();
+}
+
+void indent_level(int level) {
+  if ((level > 5) || (level < 0)) return;  // bail if something is off...
+  while (level--) Serial.print("  ");
 }
