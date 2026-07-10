@@ -48,6 +48,7 @@ void DeviceManager::Slot::fillHidDeviceInfo(HidDeviceInfo &out) const {
 
 DeviceManager::DeviceManager(USBHost &host)
     : host_(host),
+      hub_(host),
       slots_{Slot(host_, 0)} {}
 
 void DeviceManager::setDeviceChangeCallback(DeviceCallback on_device_added, DeviceCallback on_device_removed) {

@@ -54,6 +54,7 @@ private:
     };
 
     USBHost &host_;
+    USBHub hub_;
     Slot slots_[MAX_SLOTS];
 
     DeviceCallback on_device_added_ = nullptr;
