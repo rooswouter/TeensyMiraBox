@@ -197,6 +197,11 @@ void DeviceManager::onControlConnected(Slot &slot) {
 
     slot.device = dev;
 
+    // Configure transport parameters and device type now (no USB traffic).
+    // The added callback relies on get_device_type() being valid even for
+    // devices whose init() is deferred (K1Pro).
+    dev->set_device();
+
     if (auto_open_) {
         if (!slot.device->open()) {
             delete dev;
@@ -205,7 +210,19 @@ void DeviceManager::onControlConnected(Slot &slot) {
             return;
         }
     }
-    if (auto_open_ && auto_init_) {
+
+    if (isK1Pro(info.vendor_id, info.product_id)) {
+        // The K1Pro ignores (NAKs) commands sent right after enumeration, which
+        // wedges the interrupt OUT pipe and blocks every later write. Give it
+        // the same settle time the k1pro.ino bring-up sequence uses.
+        const uint32_t settle_deadline = millis() + 500;
+        while ((int32_t)(millis() - settle_deadline) < 0) {
+            host_.Task();
+            yield();
+        }
+    } else if (auto_open_ && auto_init_) {
+        // K1Pro is initialized via keyboard_mode(1) from the added callback;
+        // running init() here as well would do it twice and too early.
         slot.device->init();
     }
 

@@ -80,5 +80,7 @@ private:
     volatile uint8_t read_tail_ = 0;
 
     Transfer_t mytransfers[2] __attribute__((aligned(32)));
+
+    int tmp_index_ = 0;
 };
 #endif // __MiraBoxHIDInput_h_

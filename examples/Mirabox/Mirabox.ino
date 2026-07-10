@@ -56,11 +56,25 @@ void key_callback(StreamDock *device, const InputEvent &event)
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial && millis() < 3000) {
+    // wait for the Serial Monitor so early prints are not lost
+  }
+  Serial.println("Mirabox DeviceManager example starting");
   dm.setDeviceChangeCallback(onAdded, onRemoved);
   dm.begin(true, true);
-  MiraBoxHIDInput::show_raw_data = true;
+
+  MiraBoxHIDInput::show_raw_data = false;
+  MiraBoxHIDInput::show_formated_data = false;
   myusb.begin();  // required
 }
 void loop() {
   dm.poll();      // calls host_.Task() internally
+
+  // Periodic liveness/status line so a silent serial port can be told apart
+  // from a hung board or an unclaimed device.
+  static unsigned long last_status_ms = 0;
+  if (millis() - last_status_ms >= 5000) {
+    last_status_ms = millis();
+    //Serial.printf("[status] alive, devices connected: %u\n", (unsigned)dm.deviceCount());
+  }
 }

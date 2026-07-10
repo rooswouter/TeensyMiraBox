@@ -216,6 +216,7 @@ void StreamDock::dispatch_touchscreen_event(const InputEvent &event) {
 }
 
 bool StreamDock::is_input_event_packet(const uint8_t *data, size_t length) const {
+   
     if (feature_option.deviceType == device_type::k1pro) {
         return length >= 11
             && data[0] == 0x04

@@ -9,42 +9,30 @@ void MiraBoxHIDInput::init() {
 }
 
 hidclaim_t MiraBoxHIDInput::claim_collection(USBHIDParser *driver, Device_t *dev, uint32_t topusage) {
+  
   if (show_raw_data) {
     Serial.printf("MiraBoxHIDInput(%u : %p : %p) Claim: %x:%x usage: %x", index_, this, driver, dev->idVendor, dev->idProduct, topusage);
     Serial.printf(" SubClass: %x Protocol: %x",  driver->interfaceSubClass(), driver->interfaceProtocol());
   }
 
-  // index 1 = boot keyboard HID, index 2 = StreamDock control HID (non-boot interface).
-  // USBHost_t36 only calls hid_process_in_data() on topusage_drivers[0], so index 2
-  // must claim the first collection on the control interface (not a later 0xFFA0 one).
-  if (index_ == 1) {
-    if (driver->interfaceSubClass() != 1 || driver->interfaceProtocol() !=1) {
-      if (show_raw_data) Serial.println(" - NO (not boot keyboard)");
-      return CLAIM_NO;
-    }
-  } else if (index_ == 2) {
-    if (driver->interfaceSubClass() == 1 && driver->interfaceProtocol() == 1) {
-      if (show_raw_data) Serial.println(" - NO (boot keyboard interface)");
-      return CLAIM_NO;
-    }
-    // The StreamDock control collection lives on a vendor-defined usage page
-    // (0xFFA0 in the desktop SDK). Reject standard pages (mouse/consumer/etc.)
-    // so multi-interface devices like the 293S bind the right interface.
-    const uint16_t usage_page = (uint16_t)(topusage >> 16);
-    if (usage_page < 0xFF00) {
-      if (show_raw_data) Serial.println(" - NO (not vendor-defined usage page)");
-      return CLAIM_NO;
-    }
-  }
+  const uint16_t usage_page = (uint16_t)(topusage >> 16);
+  const uint16_t usage = (uint16_t)(topusage & 0xffff);
   if (mydevice != NULL && dev != mydevice) {
     if (show_raw_data) Serial.println("- NO (Device)");
     return CLAIM_NO;
   }
-  if (usage_ && (usage_ != topusage)) {
-    if (show_raw_data) Serial.printf(" - NO (Usage: %x)\n", usage_);
-    return CLAIM_NO;  // Only claim one
-  }
 
+  /* 
+    For 293S, N3   
+    if (usage_page != 0xFFA0 || index_ != 2) {
+    For K1Pro
+    if (usage_page != 0x000C || index_ != 2) {
+  */
+  if (!(usage_page == 0x000C || usage_page == 0xFFA0) || index_ != 2) {
+    if (show_raw_data) Serial.println(" - NO (not vendor-defined usage page)");
+    return CLAIM_NO;
+  }
+  tmp_index_++;
   bool dump_hid_info = (usage_ == 0);
 
 
@@ -54,11 +42,7 @@ hidclaim_t MiraBoxHIDInput::claim_collection(USBHIDParser *driver, Device_t *dev
   driver_ = driver;  // remember the driver.
   if (show_raw_data) Serial.println(" - Yes");
 
-  // The K1Pro control interface uses 512+ byte endpoints. USBHIDParser's
-  // internal _bigBuffer is only 928 bytes, so its default RX/TX buffer
-  // carve-out underflows the buffer and corrupts memory (hard reset).
-  // Supply adequately sized external buffers instead. This must happen
-  // here (during parse()) so the "_rx1 == nullptr" fallback never runs.
+  // Required for K1PRo, N3, always used ever for 513 bytes devices?
   if (index_ == 2) {
     static uint8_t rx_buf1[1024] __attribute__((aligned(32)));
     static uint8_t rx_buf2[1024] __attribute__((aligned(32)));
@@ -75,7 +59,9 @@ hidclaim_t MiraBoxHIDInput::claim_collection(USBHIDParser *driver, Device_t *dev
 
   // if Boot Mouse - then set idle
   if ((driver->interfaceSubClass() == 1) && (driver->interfaceProtocol() == 1)) {
-    USBHDBGSerial.printf(">> Boot Keyboard - Send SET_IDLE <<\n");
+    if (show_raw_data) {
+      USBHDBGSerial.printf(">> Boot Keyboard - Send SET_IDLE <<\n");
+    }
     driver->sendControlPacket(0x21, 10, 0, 0, 0, nullptr); //10=SET_IDLE
 
   }
@@ -184,23 +170,19 @@ bool MiraBoxHIDInput::hid_process_in_data(const Transfer_t *transfer) {
   hid_input_begin_level_ = 0;     // always make sure we reset to 0
   count_usages_ = index_usages_;  // remember how many we output for this one
   index_usages_ = 0;              // reset the index back to zero
-
-  if (show_raw_data) {
-    Serial.printf("HID(%u : %x)", index_, usage_);
-  }
-  
+  printf("hid_process_in_data() transfer->length: %d\n", transfer->length);
   // Index 1 is keyboard, index 2 is mirabox buttons
   switch (index_) {
     case 1:
       handle_keyboard_data(transfer);
       return !show_formated_data;
     case 2:
-      if (show_raw_data) {
-        Serial.print(" IN: ");
-        dump_hexbytes(transfer->buffer, min(transfer->length, (uint32_t)32), 0);
-      }
       queueInputReport((const uint8_t *)transfer->buffer, transfer->length);
       handle_mirabox_buttons_data(transfer);
+      if (show_raw_data) {
+        Serial.printf("HID(%u : %x) IN: ", index_, usage_);
+        dump_hexbytes(transfer->buffer, min(transfer->length, (uint32_t)32), 0);
+      }
       // Always bypass HID parse(); StreamDock protocol needs raw report bytes.
       return true;
     default:
@@ -234,8 +216,7 @@ bool MiraBoxHIDInput::hid_process_out_data(const Transfer_t *transfer) {
 
 
 void MiraBoxHIDInput::hid_input_begin(uint32_t topusage, uint32_t type, int lgmin, int lgmax) {
-  // Lets do simplified data for changed only
-  if (changed_data_only) return;
+  if (changed_data_only || !show_formated_data) return;
 
   indent_level(hid_input_begin_level_);
   Serial.printf("Begin topusage:%x type:%x min:%d max:%d\n", topusage, type, lgmin, lgmax);
@@ -244,6 +225,7 @@ void MiraBoxHIDInput::hid_input_begin(uint32_t topusage, uint32_t type, int lgmi
 }
 
 void MiraBoxHIDInput::hid_input_data(uint32_t usage, int32_t value) {
+  if (!show_formated_data) return;
 
   bool output_data = !changed_data_only;
 
@@ -281,8 +263,7 @@ void MiraBoxHIDInput::hid_input_data(uint32_t usage, int32_t value) {
 
 
 void MiraBoxHIDInput::hid_input_end() {
-  // Lets do simplified data for changed only
-  if (changed_data_only) return;
+  if (changed_data_only || !show_formated_data) return;
   hid_input_begin_level_--;
   indent_level(hid_input_begin_level_);
   Serial.println("END:");
@@ -513,6 +494,7 @@ bool MiraBoxHIDInput::is_input_event_packet(const Transfer_t *transfer)
 
 
 void dump_hexbytes(const void *ptr, uint32_t len, uint32_t indent) {
+  if (!MiraBoxHIDInput::show_raw_data && !MiraBoxHIDInput::show_formated_data) return;
   if (ptr == NULL || len == 0) return;
   uint32_t count = 0;
   //  if (len > 64) len = 64; // don't go off deep end...

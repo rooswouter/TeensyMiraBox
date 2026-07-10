@@ -59,12 +59,11 @@ std::string LibUSBHIDAPI::getFirmwareVersion() {
 }
 
 size_t LibUSBHIDAPI::read(uint8_t *buffer, size_t capacity, int timeout_ms) {
-    (void)timeout_ms;
 
     if (!is_open_ || buffer == nullptr || capacity == 0) {
+        printf("error");
         return 0;
     }
-
     const unsigned long deadline = millis() + (timeout_ms < 0 ? 0UL : (unsigned long)timeout_ms);
     do {
         // Return the full report, zero padding included. The Python SDK does the
