@@ -2,10 +2,28 @@
 
 #include <Arduino.h>
 #include "../DeviceConfig.h"
+#include <cstdio>
 #include <vector>
 
 #include <SD.h>
 #include <SPI.h>
+
+const char* const device_type_names[] = {
+    "StreamDockUniversal",
+    "StreamDock293",
+    "StreamDock293V3",
+    "StreamDock293s",
+    "StreamDock293sV3",
+    "StreamDockM3",
+    "StreamDockM18",
+    "StreamDockN1",
+    "StreamDockN3",
+    "StreamDockN4",
+    "StreamDockN4Pro",
+    "StreamDockXL",
+    "K1Pro",
+    "StreamDockMini",
+};
 
 StreamDock::StreamDock(LibUSBHIDAPI &transport_ref, const HidDeviceInfo &dev_info)
     : transport(transport_ref), gif_controller_(*this) {
@@ -291,11 +309,28 @@ void StreamDock::service_heartbeat() {
 
 int StreamDock::set_key_image(int key, const char *filename)
 {
+    if (filename == nullptr || filename[0] == '\0') {
+        return -1;
+    }
+
     // Open file from SD card, 50kb max?
     uint8_t buffer[50 * 1024];
 
-    File file = SD.open(filename, FILE_READ);
+    char sd_path[128];
+    if (filename[0] == '/') {
+        std::snprintf(sd_path, sizeof(sd_path), "%s", filename);
+    } else {
+        const int type_index = static_cast<int>(feature_option.deviceType);
+        const char *folder = device_type_names[0];
+        if (type_index >= 0 && type_index < static_cast<int>(sizeof(device_type_names) / sizeof(device_type_names[0]))) {
+            folder = device_type_names[type_index];
+        }
+        std::snprintf(sd_path, sizeof(sd_path), "%s/key/%s", folder, filename);
+    }
+
+    File file = SD.open(sd_path, FILE_READ);
     if (!file) {
+        printf("file %s not found\n", sd_path);
         return -1;
     }
     size_t read_size = file.read(buffer, sizeof(buffer));

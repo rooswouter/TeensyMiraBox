@@ -170,7 +170,6 @@ bool MiraBoxHIDInput::hid_process_in_data(const Transfer_t *transfer) {
   hid_input_begin_level_ = 0;     // always make sure we reset to 0
   count_usages_ = index_usages_;  // remember how many we output for this one
   index_usages_ = 0;              // reset the index back to zero
-  printf("hid_process_in_data() transfer->length: %d\n", transfer->length);
   // Index 1 is keyboard, index 2 is mirabox buttons
   switch (index_) {
     case 1:

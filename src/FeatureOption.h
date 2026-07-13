@@ -3,7 +3,7 @@
 #include <cstdint>
 
 /**
- * @file FeatrueOption.h
+ * @file FeatureOption.h
  * @brief Device model identifier and capability flags.
  */
 
@@ -25,11 +25,14 @@ enum class device_type : uint8_t {
     dock_mini = 13,
 };
 
+extern const char* const device_type_names[];
+
+
 /**
- * @class FeatrueOption
+ * @class FeatureOption
  * @brief Runtime capability flags set by each device in `set_device()`.
  */
-class FeatrueOption {
+class FeatureOption {
 public:
     bool hasRGBLed = false;
     int ledCounts = 0;
