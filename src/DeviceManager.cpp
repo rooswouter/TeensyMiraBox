@@ -30,7 +30,7 @@ bool DeviceManager::Slot::isControlConnected() const {
     return control.isConnected();
 }
 
-void DeviceManager::Slot::fillHidDeviceInfo(HidDeviceInfo &out) const {
+void DeviceManager::Slot::fillHidDeviceInfo(HidDeviceInfo &out) {
     out.vendor_id = control.idVendor();
     out.product_id = control.idProduct();
     out.serial_number = safeToString(control.serialNumber());

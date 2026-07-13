@@ -92,7 +92,7 @@ private:
         Slot(USBHost &host, uint8_t slotIndex);
 
         bool isControlConnected() const;
-        void fillHidDeviceInfo(HidDeviceInfo &out) const;
+        void fillHidDeviceInfo(HidDeviceInfo &out);
     };
 
     USBHost &host_;
