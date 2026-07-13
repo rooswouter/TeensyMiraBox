@@ -375,7 +375,7 @@ void LibUSBHIDAPI::setKeyboardLightingSpeed(int speed) {
 }
 
 void LibUSBHIDAPI::setKeyboardRgbBacklight(int red, int green, int blue) {
-    const uint8_t params[6] = {0, 0, 0, (uint8_t)red, (uint8_t)green, (uint8_t)blue};
+    const uint8_t params[4] = {1, (uint8_t)red, (uint8_t)green, (uint8_t)blue};
     sendCrt("COLOR", params, sizeof(params));
 }
 
