@@ -8,14 +8,15 @@ void onAdded(StreamDock *device) {
   Serial.println("Device added");
   device->init();
 
-  for(int i = 2; i <= 2; i++) {
-    // Place a device-sized GIF on the SD card, e.g. StreamDockN3/key/anim.gif (64x64)
-    if (device->set_key_gif(i, "anim.gif") == 0) {
+  if (device->set_key_gif(1, "anim.gif") == 0) {
       Serial.println("Key GIF loaded");
+      GifSharedStream shared = device->export_key_gif_stream(1);
+      for(int i = 2; i <= 14; i++) {
+        device->set_key_gif_shared(i, shared);
+      }
     } else {
       Serial.println("set_key_gif failed (ENABLE_ANIMATEDGIF defined? GIF on SD?)");
     }
-  }
 }
 
 void setup() {

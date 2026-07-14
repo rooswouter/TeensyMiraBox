@@ -163,6 +163,9 @@ public:
     /** @brief Access the GIF animation controller. */
     GifController &gifer() { return gif_controller_; }
 
+    /** @brief Access the GIF file loader (decode / shared streams). */
+    GifLoader &gif_loader() { return gif_loader_; }
+
     /**
      * @brief Assign an in-memory GIF to a key.
      * @param frames Array of pointers to JPEG frame data.
@@ -216,6 +219,21 @@ public:
      * @return 0 on success, -1 on failure or when GIF support is disabled.
      */
     int set_background_gif_data(const uint8_t *data, size_t length, int x = 0, int y = 0, uint8_t fb_layer = 0x00);
+
+    /**
+     * @brief Assign a key GIF using frames shared from another device's GifLoader.
+     * @return 0 on success, -1 on failure.
+     */
+    int set_key_gif_shared(int key, const GifSharedStream &shared);
+
+    /**
+     * @brief Assign a background GIF using frames shared from another GifLoader.
+     * @return 0 on success, -1 on failure.
+     */
+    int set_background_gif_shared(const GifSharedStream &shared, int x = 0, int y = 0, uint8_t fb_layer = 0x00);
+
+    /** @brief Export a loaded key GIF for sharing with another GifLoader. */
+    GifSharedStream export_key_gif_stream(int key) const { return gif_loader_.exportKeyStream(key); }
 
     /** @return Device path or serial string. */
     std::string getPath() const;

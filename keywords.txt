@@ -10,6 +10,7 @@ DeviceManager	KEYWORD1
 StreamDock	KEYWORD1
 GifController	KEYWORD1
 GifLoader	KEYWORD1
+GifSharedStream	KEYWORD1
 MiraBoxHIDInput	KEYWORD1
 LibUSBHIDAPI	KEYWORD1
 FeatureOption	KEYWORD1
@@ -89,6 +90,10 @@ set_key_gif	KEYWORD2
 set_key_gif_data	KEYWORD2
 set_background_gif	KEYWORD2
 set_background_gif_data	KEYWORD2
+set_key_gif_shared	KEYWORD2
+set_background_gif_shared	KEYWORD2
+export_key_gif_stream	KEYWORD2
+gif_loader	KEYWORD2
 getPath	KEYWORD2
 get_serial_number	KEYWORD2
 get_device_type	KEYWORD2
@@ -125,6 +130,10 @@ loadKeyGif	KEYWORD2
 loadBackgroundGif	KEYWORD2
 loadKeyGifFile	KEYWORD2
 loadBackgroundGifFile	KEYWORD2
+loadKeyGifShared	KEYWORD2
+loadBackgroundGifShared	KEYWORD2
+exportKeyStream	KEYWORD2
+exportBackgroundStream	KEYWORD2
 releaseKey	KEYWORD2
 releaseBackground	KEYWORD2
 releaseAll	KEYWORD2

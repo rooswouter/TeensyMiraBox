@@ -131,6 +131,24 @@ Use the same device-type folder names as for JPEG key images (e.g. `StreamDockN3
 
 Successful `set_key_gif()` / `set_background_gif()` calls upload frame 0 immediately and start the GIF loop automatically.
 
+### Sharing decoded GIFs between keys or devices
+
+Decode once, then reuse the frame buffers via `GifSharedStream` (reference counted):
+
+```cpp
+// Same device: load key 1, share to keys 2 and 3
+device->set_key_gif(1, "anim.gif");
+GifSharedStream shared = device->export_key_gif_stream(1);
+device->set_key_gif_shared(2, shared);
+device->set_key_gif_shared(3, shared);
+
+// Across devices (same GIF dimensions)
+GifSharedStream shared = deviceA->export_key_gif_stream(1);
+deviceB->set_key_gif_shared(2, shared);
+```
+
+Clearing any key or calling `close()` releases one reference; frame memory is freed when the last reference is dropped.
+
 See `examples/GifExample/GifExample.ino`.
 
 ## Input events

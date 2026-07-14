@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GifLoader.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -103,8 +104,8 @@ private:
     GifStreamStatus *find_stream(int index);
 
     StreamDock &device_;
-    GifStreamStatus streams_[8];
-    int stream_indices_[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+    GifStreamStatus streams_[MAX_STREAMS];
+    int stream_indices_[MAX_STREAMS];
     size_t stream_count_ = 0;
     bool loop_enabled_ = false;
     bool running_ = true;

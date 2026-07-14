@@ -239,6 +239,14 @@ int StreamDock::set_background_gif_data(const uint8_t *data, size_t length, int 
     return gif_loader_.loadBackgroundGif(data, length, x, y, fb_layer);
 }
 
+int StreamDock::set_key_gif_shared(int key, const GifSharedStream &shared) {
+    return gif_loader_.loadKeyGifShared(key, shared);
+}
+
+int StreamDock::set_background_gif_shared(const GifSharedStream &shared, int x, int y, uint8_t fb_layer) {
+    return gif_loader_.loadBackgroundGifShared(shared, x, y, fb_layer);
+}
+
 bool StreamDock::resolve_sd_path(const char *filename, const char *subdir, char *sd_path, size_t sd_path_len) const {
     if (filename == nullptr || sd_path == nullptr || sd_path_len == 0) {
         return false;

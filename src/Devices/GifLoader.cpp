@@ -17,7 +17,11 @@
 #endif
 
 GifLoader::GifLoader(StreamDock &device, GifController &gif_controller)
-    : device_(device), gif_controller_(gif_controller) {}
+    : device_(device), gif_controller_(gif_controller) {
+        for (size_t i = 0; i < MAX_STREAMS; ++i) {
+            entry_indices_[i] = -1;
+        }
+    }
 
 void GifLoader::streamRemovedThunk(int stream_index, void *context) {
     if (context != nullptr) {
@@ -25,79 +29,101 @@ void GifLoader::streamRemovedThunk(int stream_index, void *context) {
     }
 }
 
-GifLoader::OwnedGifStream *GifLoader::findEntry(int stream_index) {
-    for (size_t i = 0; i < kMaxOwnedStreams; ++i) {
-        if (entry_indices_[i] == stream_index && entries_[i].active) {
-            return &entries_[i];
-        }
+void GifLoader::freeStreamData(GifSharedStream::GifStreamData *data) {
+    if (data == nullptr) {
+        return;
     }
-    return nullptr;
+    if (data->frames != nullptr) {
+        for (size_t i = 0; i < data->frame_count; ++i) {
+            free(data->frames[i]);
+        }
+        free(data->frames);
+        data->frames = nullptr;
+    }
+    free(data->frame_sizes);
+    free(data->delays);
+    data->frame_sizes = nullptr;
+    data->delays = nullptr;
+    data->frame_count = 0;
+    data->ref_count = 0;
+    free(data);
 }
 
-const GifLoader::OwnedGifStream *GifLoader::findEntry(int stream_index) const {
-    for (size_t i = 0; i < kMaxOwnedStreams; ++i) {
-        if (entry_indices_[i] == stream_index && entries_[i].active) {
-            return &entries_[i];
-        }
+void GifLoader::freePartialStreamData(GifSharedStream::GifStreamData *data, size_t decoded_frame_count) {
+    if (data == nullptr) {
+        return;
     }
-    return nullptr;
-}
-
-void GifLoader::freeEntry(OwnedGifStream &entry) {
-    if (entry.frames != nullptr) {
-        for (size_t i = 0; i < entry.frame_count; ++i) {
-            free(entry.frames[i]);
-        }
-        free(entry.frames);
-        entry.frames = nullptr;
-    }
-    free(entry.frame_sizes);
-    free(entry.delays);
-    entry.frame_sizes = nullptr;
-    entry.delays = nullptr;
-    entry.frame_count = 0;
-    entry.active = false;
-}
-
-void GifLoader::freePartialEntry(OwnedGifStream &entry, size_t decoded_frame_count) {
-    if (entry.frames != nullptr) {
+    if (data->frames != nullptr) {
         for (size_t i = 0; i < decoded_frame_count; ++i) {
-            free(entry.frames[i]);
+            free(data->frames[i]);
         }
-        free(entry.frames);
-        entry.frames = nullptr;
+        free(data->frames);
+        data->frames = nullptr;
     }
-    free(entry.frame_sizes);
-    free(entry.delays);
-    entry.frame_sizes = nullptr;
-    entry.delays = nullptr;
-    entry.frame_count = 0;
-    entry.active = false;
+    free(data->frame_sizes);
+    free(data->delays);
+    data->frame_sizes = nullptr;
+    data->delays = nullptr;
+    data->frame_count = 0;
+    data->ref_count = 0;
+    free(data);
 }
 
-int GifLoader::storeEntry(int stream_index, OwnedGifStream &entry) {
+void GifLoader::retainStreamData(GifSharedStream::GifStreamData *data) {
+    if (data != nullptr) {
+        ++data->ref_count;
+    }
+}
+
+void GifLoader::releaseStreamData(GifSharedStream::GifStreamData *data) {
+    if (data == nullptr) {
+        return;
+    }
+    if (data->ref_count > 0) {
+        --data->ref_count;
+    }
+    if (data->ref_count == 0) {
+        freeStreamData(data);
+    }
+}
+
+GifLoader::StreamEntry *GifLoader::findEntry(int stream_index) {
+    for (size_t i = 0; i < MAX_STREAMS; ++i) {
+        if (entry_indices_[i] == stream_index && entries_[i].active) {
+            return &entries_[i];
+        }
+    }
+    return nullptr;
+}
+
+const GifLoader::StreamEntry *GifLoader::findEntry(int stream_index) const {
+    for (size_t i = 0; i < MAX_STREAMS; ++i) {
+        if (entry_indices_[i] == stream_index && entries_[i].active) {
+            return &entries_[i];
+        }
+    }
+    return nullptr;
+}
+
+int GifLoader::storeEntry(int stream_index, GifSharedStream::GifStreamData *data) {
     removeEntry(stream_index);
-    for (size_t i = 0; i < kMaxOwnedStreams; ++i) {
+    for (size_t i = 0; i < MAX_STREAMS; ++i) {
         if (!entries_[i].active) {
-            entries_[i] = entry;
-            entry_indices_[i] = stream_index;
+            entries_[i].data = data;
             entries_[i].active = true;
-            entry.frames = nullptr;
-            entry.frame_sizes = nullptr;
-            entry.delays = nullptr;
-            entry.frame_count = 0;
-            entry.active = false;
+            entry_indices_[i] = stream_index;
             return 0;
         }
     }
-    freeEntry(entry);
     return -1;
 }
 
 void GifLoader::removeEntry(int stream_index) {
-    if (OwnedGifStream *entry = findEntry(stream_index)) {
-        freeEntry(*entry);
-        for (size_t i = 0; i < kMaxOwnedStreams; ++i) {
+    if (StreamEntry *entry = findEntry(stream_index)) {
+        releaseStreamData(entry->data);
+        entry->data = nullptr;
+        entry->active = false;
+        for (size_t i = 0; i < MAX_STREAMS; ++i) {
             if (entry_indices_[i] == stream_index) {
                 entry_indices_[i] = -1;
                 break;
@@ -126,18 +152,42 @@ void GifLoader::releaseBackground() {
 }
 
 void GifLoader::releaseAll() {
-    for (size_t i = 0; i < kMaxOwnedStreams; ++i) {
+    for (size_t i = 0; i < MAX_STREAMS; ++i) {
         if (entries_[i].active) {
-            freeEntry(entries_[i]);
+            releaseStreamData(entries_[i].data);
+            entries_[i].data = nullptr;
+            entries_[i].active = false;
             entry_indices_[i] = -1;
         }
     }
 }
 
+GifSharedStream GifLoader::exportKeyStream(int key) const {
+    GifSharedStream shared;
+    if (key < 1) {
+        return shared;
+    }
+    const int hardware_key = device_.get_image_key(static_cast<ButtonKey>(key));
+    if (hardware_key < 0) {
+        return shared;
+    }
+    if (const StreamEntry *entry = findEntry(hardware_key)) {
+        shared.data_ = entry->data;
+    }
+    return shared;
+}
+
+GifSharedStream GifLoader::exportBackgroundStream() const {
+    GifSharedStream shared;
+    if (const StreamEntry *entry = findEntry(GifController::BACKGROUND_INDEX)) {
+        shared.data_ = entry->data;
+    }
+    return shared;
+}
+
 #ifndef ENABLE_ANIMATEDGIF
 
 int GifLoader::loadKeyGif(int, const uint8_t *, size_t) {
-    aaaa
     return -1;
 }
 
@@ -150,6 +200,14 @@ int GifLoader::loadKeyGifFile(int, const char *) {
 }
 
 int GifLoader::loadBackgroundGifFile(const char *, int, int, uint8_t) {
+    return -1;
+}
+
+int GifLoader::loadKeyGifShared(int, const GifSharedStream &) {
+    return -1;
+}
+
+int GifLoader::loadBackgroundGifShared(const GifSharedStream &, int, int, uint8_t) {
     return -1;
 }
 
@@ -267,19 +325,29 @@ size_t encodeRgbToJpeg(const uint8_t *rgb, int width, int height, uint8_t **out_
 
 } // namespace
 
-int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_width, int target_height, OwnedGifStream &out) {
+int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_width, int target_height, GifSharedStream::GifStreamData *&out) {
+    out = nullptr;
     if (data == nullptr || length == 0) {
         return -1;
     }
     if (length > GIF_MAX_FILE_BYTES) {
         return -1;
     }
+
+    GifSharedStream::GifStreamData *stream = static_cast<GifSharedStream::GifStreamData *>(
+        calloc(1, sizeof(GifSharedStream::GifStreamData)));
+    if (stream == nullptr) {
+        return -1;
+    }
+    stream->ref_count = 1;
+
     AnimatedGIF gif;
     gif.begin(GIF_PALETTE_RGB888);
 
     int result = gif.open(const_cast<uint8_t *>(data), static_cast<int>(length), gifDrawRgb888);
     if (gif.getLastError() != GIF_SUCCESS) {
         Serial.printf("GIF open failed: error %i, length %i\n", gif.getLastError(), length);
+        freeStreamData(stream);
         return -1;
     }
     const int canvas_width = gif.getCanvasWidth();
@@ -287,18 +355,22 @@ int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_
     if (canvas_width != target_width || canvas_height != target_height) {
         gif.close();
         Serial.printf("GIF canvas %dx%d does not match required %dx%d\n", canvas_width, canvas_height, target_width, target_height);
+        freeStreamData(stream);
         return -1;
     }
     if (canvas_width > GIF_MAX_CANVAS_WIDTH || canvas_height > GIF_MAX_CANVAS_HEIGHT) {
         gif.close();
+        freeStreamData(stream);
         return -1;
     }
     if (gif.setDrawType(GIF_DRAW_COOKED) != GIF_SUCCESS) {
         gif.close();
+        freeStreamData(stream);
         return -1;
     }
     if (gif.allocFrameBuf(gifAllocCallback) != GIF_SUCCESS) {
         gif.close();
+        freeStreamData(stream);
         return -1;
     }
     GIFINFO info;
@@ -306,19 +378,21 @@ int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_
     if (gif.getInfo(&info) != 1 || info.iFrameCount <= 0) {
         releaseGifFrameBuf(gif);
         gif.close();
+        freeStreamData(stream);
         return -1;
     }
     size_t frame_count = static_cast<size_t>(info.iFrameCount);
     if (frame_count > GIF_MAX_FRAMES) {
         releaseGifFrameBuf(gif);
         gif.close();
+        freeStreamData(stream);
         return -1;
     }
-    out.frames = static_cast<uint8_t **>(calloc(frame_count, sizeof(uint8_t *)));
-    out.frame_sizes = static_cast<size_t *>(calloc(frame_count, sizeof(size_t)));
-    out.delays = static_cast<int *>(calloc(frame_count, sizeof(int)));
-    if (out.frames == nullptr || out.frame_sizes == nullptr || out.delays == nullptr) {
-        freePartialEntry(out, 0);
+    stream->frames = static_cast<uint8_t **>(calloc(frame_count, sizeof(uint8_t *)));
+    stream->frame_sizes = static_cast<size_t *>(calloc(frame_count, sizeof(size_t)));
+    stream->delays = static_cast<int *>(calloc(frame_count, sizeof(int)));
+    if (stream->frames == nullptr || stream->frame_sizes == nullptr || stream->delays == nullptr) {
+        freePartialStreamData(stream, 0);
         releaseGifFrameBuf(gif);
         gif.close();
         return -1;
@@ -326,7 +400,7 @@ int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_
     const size_t rgb_size = static_cast<size_t>(canvas_width) * static_cast<size_t>(canvas_height) * 3;
     uint8_t *rgb = static_cast<uint8_t *>(malloc(rgb_size));
     if (rgb == nullptr) {
-        freePartialEntry(out, 0);
+        freePartialStreamData(stream, 0);
         releaseGifFrameBuf(gif);
         gif.close();
         return -1;
@@ -343,7 +417,7 @@ int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_
         const int play_result = gif.playFrame(true, &delay_ms, &rgb_ctx);
         if (play_result < 0) {
             free(rgb);
-            freePartialEntry(out, frame_index);
+            freePartialStreamData(stream, frame_index);
             releaseGifFrameBuf(gif);
             gif.close();
             return -1;
@@ -353,22 +427,89 @@ int GifLoader::decodeGifToStream(const uint8_t *data, size_t length, int target_
         const size_t jpeg_size = encodeRgbToJpeg(rgb, canvas_width, canvas_height, &jpeg_data);
         if (jpeg_size == 0 || jpeg_data == nullptr) {
             free(rgb);
-            freePartialEntry(out, frame_index);
+            freePartialStreamData(stream, frame_index);
             releaseGifFrameBuf(gif);
             gif.close();
             return -1;
         }
 
-        out.frames[frame_index] = jpeg_data;
-        out.frame_sizes[frame_index] = jpeg_size;
-        out.delays[frame_index] = normalizeDelay(delay_ms);
+        stream->frames[frame_index] = jpeg_data;
+        stream->frame_sizes[frame_index] = jpeg_size;
+        stream->delays[frame_index] = normalizeDelay(delay_ms);
     }
     free(rgb);
     releaseGifFrameBuf(gif);
     gif.close();
 
-    out.frame_count = frame_count;
-    out.active = true;
+    stream->frame_count = frame_count;
+    out = stream;
+    return 0;
+}
+
+int GifLoader::registerKeyStream(int key, int hardware_key, GifSharedStream::GifStreamData *data) {
+    if (data == nullptr || data->frame_count == 0) {
+        return -1;
+    }
+
+    if (gif_controller_.set_key_gif_stream(
+            const_cast<const uint8_t *const *>(data->frames),
+            data->frame_sizes,
+            data->delays,
+            data->frame_count,
+            key) != 0) {
+        return -1;
+    }
+
+    const uint8_t *frame0 = data->frames[0];
+    const size_t frame0_size = data->frame_sizes[0];
+
+    if (storeEntry(hardware_key, data) != 0) {
+        gif_controller_.clear_key_gif(key);
+        return -1;
+    }
+
+    device_.transport.setKeyImageStream(frame0, frame0_size, hardware_key);
+    device_.refresh();
+    device_.start_gif_loop();
+    return 0;
+}
+
+int GifLoader::registerBackgroundStream(GifSharedStream::GifStreamData *data, int x, int y, uint8_t fb_layer) {
+    if (data == nullptr || data->frame_count == 0) {
+        return -1;
+    }
+
+    const ImageFormat format = device_.touchscreen_image_format();
+
+    if (gif_controller_.set_background_gif_stream(
+            const_cast<const uint8_t *const *>(data->frames),
+            data->frame_sizes,
+            data->delays,
+            data->frame_count,
+            x,
+            y,
+            fb_layer) != 0) {
+        return -1;
+    }
+
+    const uint8_t *frame0 = data->frames[0];
+    const size_t frame0_size = data->frame_sizes[0];
+
+    if (storeEntry(GifController::BACKGROUND_INDEX, data) != 0) {
+        gif_controller_.clear_background_gif();
+        return -1;
+    }
+
+    device_.transport.setBackgroundFrameStream(
+        frame0,
+        frame0_size,
+        format.width,
+        format.height,
+        x,
+        y,
+        fb_layer);
+    device_.refresh();
+    device_.start_gif_loop();
     return 0;
 }
 
@@ -387,33 +528,39 @@ int GifLoader::loadKeyGif(int key, const uint8_t *data, size_t length) {
         return -1;
     }
     
-    OwnedGifStream stream;
+    GifSharedStream::GifStreamData *stream = nullptr;
     if (decodeGifToStream(data, length, format.width, format.height, stream) != 0) {
         return -1;
     }
 
-    if (gif_controller_.set_key_gif_stream(
-            const_cast<const uint8_t *const *>(stream.frames),
-            stream.frame_sizes,
-            stream.delays,
-            stream.frame_count,
-            key) != 0) {
-        freeEntry(stream);
+    const int result = registerKeyStream(key, hardware_key, stream);
+    if (result != 0) {
+        releaseStreamData(stream);
+    }
+    return result;
+}
+
+int GifLoader::loadKeyGifShared(int key, const GifSharedStream &shared) {
+    if (!shared.valid() || !device_.feature_option.supportKeyGif || key < 1 || key > device_.image_keys()) {
         return -1;
     }
 
-    const uint8_t *frame0 = stream.frames[0];
-    const size_t frame0_size = stream.frame_sizes[0];
-
-    if (storeEntry(hardware_key, stream) != 0) {
-        gif_controller_.clear_key_gif(key);
+    const ImageFormat format = device_.key_image_format();
+    if (format.format != ImageFileFormat::JPEG || format.width == 0 || format.height == 0) {
         return -1;
     }
 
-    device_.transport.setKeyImageStream(frame0, frame0_size, hardware_key);
-    device_.refresh();
-    device_.start_gif_loop();
-    return 0;
+    const int hardware_key = device_.get_image_key(static_cast<ButtonKey>(key));
+    if (hardware_key < 0) {
+        return -1;
+    }
+
+    retainStreamData(shared.data_);
+    const int result = registerKeyStream(key, hardware_key, shared.data_);
+    if (result != 0) {
+        releaseStreamData(shared.data_);
+    }
+    return result;
 }
 
 int GifLoader::loadBackgroundGif(const uint8_t *data, size_t length, int x, int y, uint8_t fb_layer) {
@@ -426,49 +573,41 @@ int GifLoader::loadBackgroundGif(const uint8_t *data, size_t length, int x, int 
         return -1;
     }
 
-    OwnedGifStream stream;
+    GifSharedStream::GifStreamData *stream = nullptr;
     if (decodeGifToStream(data, length, format.width, format.height, stream) != 0) {
         return -1;
     }
 
-    if (gif_controller_.set_background_gif_stream(
-            const_cast<const uint8_t *const *>(stream.frames),
-            stream.frame_sizes,
-            stream.delays,
-            stream.frame_count,
-            x,
-            y,
-            fb_layer) != 0) {
-        freeEntry(stream);
+    const int result = registerBackgroundStream(stream, x, y, fb_layer);
+    if (result != 0) {
+        releaseStreamData(stream);
+    }
+    return result;
+}
+
+int GifLoader::loadBackgroundGifShared(const GifSharedStream &shared, int x, int y, uint8_t fb_layer) {
+    if (!shared.valid() || !device_.feature_option.supportBackgroundGif) {
         return -1;
     }
 
-    const uint8_t *frame0 = stream.frames[0];
-    const size_t frame0_size = stream.frame_sizes[0];
-
-    if (storeEntry(GifController::BACKGROUND_INDEX, stream) != 0) {
-        gif_controller_.clear_background_gif();
+    const ImageFormat format = device_.touchscreen_image_format();
+    if (format.width == 0 || format.height == 0) {
         return -1;
     }
 
-    device_.transport.setBackgroundFrameStream(
-        frame0,
-        frame0_size,
-        format.width,
-        format.height,
-        x,
-        y,
-        fb_layer);
-    device_.refresh();
-    device_.start_gif_loop();
-    return 0;
+    retainStreamData(shared.data_);
+    const int result = registerBackgroundStream(shared.data_, x, y, fb_layer);
+    if (result != 0) {
+        releaseStreamData(shared.data_);
+    }
+    return result;
 }
 
 int GifLoader::loadKeyGifFile(int key, const char *sd_path) {
     if (sd_path == nullptr || sd_path[0] == '\0') {
         return -1;
     }
-
+    
     File file = SD.open(sd_path, FILE_READ);
     if (!file) {
         Serial.printf("GIF file %s not found\n", sd_path);

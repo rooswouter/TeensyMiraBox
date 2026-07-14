@@ -3,7 +3,11 @@
 
 #include <Arduino.h>
 
-GifController::GifController(StreamDock &device) : device_(device) {}
+GifController::GifController(StreamDock &device) : device_(device) {
+    for (size_t i = 0; i < MAX_STREAMS; ++i) {
+        stream_indices_[i] = -1;
+    }
+}
 
 int GifController::get_key_values(int key, int &hardware_key) const {
     if (key < 1) {
@@ -30,7 +34,7 @@ void GifController::replace_stream(int index, const GifStreamStatus &status) {
         *existing = status;
         return;
     }
-    if (stream_count_ < 8) {
+    if (stream_count_ < MAX_STREAMS) {
         streams_[stream_count_] = status;
         stream_indices_[stream_count_] = index;
         ++stream_count_;
