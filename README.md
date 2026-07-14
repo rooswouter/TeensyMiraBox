@@ -18,19 +18,19 @@ The library auto-detects devices by USB VID/PID and instantiates the matching dr
 
 | Class | Device |Tested|
 |-------|--------|--------|
-| `StreamDock293` | Stream Dock 293 | [] |
-| `StreamDock293V3` | Stream Dock 293 V3 | [] |
-| `StreamDock293s` | Stream Dock 293S |  [x] |
-| `StreamDock293sV3` | Stream Dock 293S V3 | [] |
-| `StreamDockN3` | Stream Dock N3 | [x] |
-| `StreamDockN4` | Stream Dock N4 | [x] |
-| `StreamDockN4Pro` | Stream Dock N4 Pro | [] |
-| `StreamDockN1` | Stream Dock N1 | [] |
-| `StreamDockXL` | Stream Dock XL | [] |
-| `StreamDockM3` | Stream Dock M3 | [] |
-| `StreamDockM18` | Stream Dock M18 | [] |
-| `StreamDockMini` | Stream Dock Mini | [] |
-| `K1Pro` | K1 Pro | [x] |
+| `StreamDock293` | Stream Dock 293 | ❌ |
+| `StreamDock293V3` | Stream Dock 293 V3 | ❌ |
+| `StreamDock293s` | Stream Dock 293S |  ✅ |
+| `StreamDock293sV3` | Stream Dock 293S V3 | ❌ |
+| `StreamDockN3` | Stream Dock N3 | ✅ |
+| `StreamDockN4` | Stream Dock N4 | ✅ |
+| `StreamDockN4Pro` | Stream Dock N4 Pro | ❌ |
+| `StreamDockN1` | Stream Dock N1 | ❌ |
+| `StreamDockXL` | Stream Dock XL | ❌ |
+| `StreamDockM3` | Stream Dock M3 | ❌ |
+| `StreamDockM18` | Stream Dock M18 | ❌ |
+| `StreamDockMini` | Stream Dock Mini | ❌ |
+| `K1Pro` | K1 Pro | ✅ |
 
 ## Installation
 
