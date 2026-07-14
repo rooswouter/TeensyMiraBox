@@ -1,6 +1,8 @@
-# Mirabox
+# TeensyMiraBox
 
-Arduino library for controlling **Mirabox / StreamDock** devices from a **Teensy** board using **USB Host** (`USBHost_t36`).
+[![.github/workflows/ci.yml](https://github.com/rooswouter/TeensyMiraBox/actions/workflows/ci.yml/badge.svg)](https://github.com/rooswouter/TeensyMiraBox/actions/workflows/ci.yml)
+
+Arduino library for controlling **MiraBox / StreamDock** devices from a **Teensy** board using **USB Host** (`USBHost_t36`).
 
 This is a port of the [StreamDock Python SDK](https://github.com/MiraboxLab/StreamDock-Device-SDK) adapted for embedded use: no threads, no desktop HID stack — just `setup()` / `loop()` polling.
 
@@ -35,7 +37,7 @@ The library auto-detects devices by USB VID/PID and instantiates the matching dr
 ## Installation
 
 1. Copy or symlink this folder into your Arduino `libraries` directory, e.g.  
-   `Documents/Arduino/libraries/Mirabox`
+   `Documents/Arduino/libraries/MiraBox`
 2. Install **Teensyduino** with the **USBHost_t36** library enabled.
 3. Select a Teensy 3.6 or 4.x board and compile an example sketch.
 
@@ -71,7 +73,7 @@ void loop() {
 }
 ```
 
-See `examples/Mirabox/Mirabox.ino` and `examples/k1pro/k1pro.ino` for complete sketches.
+See `examples/MiraBox/Mirabox.ino` and `examples/k1pro/k1pro.ino` for complete sketches.
 
 ## Architecture
 
@@ -150,7 +152,5 @@ Public API documentation is in the header files (Doxygen / Arduino style):
 - `MiraBoxHIDInput.h` — USB host HID driver
 - `InputTypes.h` — `InputEvent`, `EventType`, `ButtonKey`
 
-## License
 
-See `library.properties` and the parent [StreamDock Device SDK](https://github.com/MiraboxLab/StreamDock-Device-SDK) repository for license terms.
 
