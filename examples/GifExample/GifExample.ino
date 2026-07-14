@@ -11,7 +11,7 @@ void onAdded(StreamDock *device) {
   if (device->set_key_gif(1, "anim.gif") == 0) {
       Serial.println("Key GIF loaded");
       GifSharedStream shared = device->export_key_gif_stream(1);
-      for(int i = 2; i <= 14; i++) {
+      for(int i = 2; i <= device->image_keys(); i++) {
         device->set_key_gif_shared(i, shared);
       }
   } else {
