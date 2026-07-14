@@ -14,9 +14,27 @@ void onAdded(StreamDock *device) {
       for(int i = 2; i <= 14; i++) {
         device->set_key_gif_shared(i, shared);
       }
-    } else {
+  } else {
       Serial.println("set_key_gif failed (ENABLE_ANIMATEDGIF defined? GIF on SD?)");
-    }
+  }
+  device->set_key_callback(key_callback);
+}
+
+void key_callback(StreamDock *device, const InputEvent &event)
+{
+  switch(event.event_type) {
+    case EventType::BUTTON:
+      if(event.state == 1) {
+        if(device->gif_loop_status()) {
+          device->stop_gif_loop();
+        } else {
+          device->start_gif_loop();
+        }
+      }
+      break;
+    default:
+      break;
+  }
 }
 
 void setup() {
