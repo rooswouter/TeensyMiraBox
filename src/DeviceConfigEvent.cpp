@@ -1,4 +1,6 @@
 #include "DeviceConfigEvent.h"
+#include "MiraBox.h"
+#ifdef WITH_ARDUINOJSON
 #include <ArduinoJson.h>
 
 namespace {
@@ -70,3 +72,8 @@ DeviceConfigEvent::DeviceConfigEvent(const uint8_t *buffer, uint32_t length) {
 
     valid = true;
 }
+#else
+DeviceConfigEvent::DeviceConfigEvent(const uint8_t *buffer, uint32_t length) {
+    return;
+}
+#endif
